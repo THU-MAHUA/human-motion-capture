@@ -58,7 +58,7 @@ class SMPLFrame:
 class HMR2OnePerson:
     """Run HMR2.0 on exactly one detected person in a BGR image."""
 
-    def __init__(self, hmr2_root: str | Path,
+    def __init__(self, hmr2_root: str | Path | None = None,
                  checkpoint: str | None = None,
                  device: str = "cuda:0",
                  detector: str = "regnety",
@@ -66,7 +66,11 @@ class HMR2OnePerson:
                  min_detection_score: float = 0.5,
                  max_missed_detections: int = 5,
                  mesh_preview: bool = False):
-        self.hmr2_root = Path(hmr2_root).expanduser().resolve()
+        self.hmr2_root = (
+            Path(hmr2_root).expanduser().resolve()
+            if hmr2_root is not None
+            else None
+        )
         self.checkpoint = checkpoint
         self.checkpoint_path = ""
         self.device_name = device
@@ -90,17 +94,16 @@ class HMR2OnePerson:
         self.body_joint_count = 23
 
     def open(self) -> None:
-        if not self.hmr2_root.is_dir():
-            raise FileNotFoundError(f"4D-Humans repository not found: {self.hmr2_root}")
-        smpl_path = self.hmr2_root / "data" / "basicModel_neutral_lbs_10_207_0_v1.0.0.pkl"
-        if not smpl_path.is_file():
-            raise FileNotFoundError(
-                "4D-Humans neutral SMPL model is missing. Download the licensed "
-                "file and place it at " + str(smpl_path))
-        root = str(self.hmr2_root)
-        if root not in sys.path:
-            sys.path.insert(0, root)
+        if self.hmr2_root is not None:
+            if not self.hmr2_root.is_dir():
+                raise FileNotFoundError(
+                    f"4D-Humans repository not found: {self.hmr2_root}"
+                )
+            root = str(self.hmr2_root)
+            if root not in sys.path:
+                sys.path.insert(0, root)
         try:
+            import hmr2
             import torch
             from hmr2.models import download_models, load_hmr2
             from hmr2.utils import recursive_to
@@ -112,6 +115,25 @@ class HMR2OnePerson:
                 f"environment (original error: {exc})") from exc
 
         try:
+            if self.hmr2_root is None:
+                self.hmr2_root = Path(hmr2.__file__).resolve().parent.parent
+            cache_smpl = (
+                Path(CACHE_DIR_4DHUMANS)
+                / "data"
+                / "smpl"
+                / "SMPL_NEUTRAL.pkl"
+            )
+            checkout_smpl = (
+                self.hmr2_root
+                / "data"
+                / "basicModel_neutral_lbs_10_207_0_v1.0.0.pkl"
+            )
+            if not cache_smpl.is_file() and not checkout_smpl.is_file():
+                raise FileNotFoundError(
+                    "The licensed neutral SMPL model is missing. Run "
+                    "`motion-capture-download-models --install-smpl PATH` "
+                    f"to install it at {cache_smpl}."
+                )
             if self.checkpoint is None:
                 download_models(CACHE_DIR_4DHUMANS)
                 from hmr2.models import DEFAULT_CHECKPOINT
@@ -304,11 +326,15 @@ class HMR2OnePerson:
 class HMR2Process:
     """HMR2 client backed by a dedicated Python 3.10 worker process."""
 
-    def __init__(self, python: str | Path, hmr2_root: str | Path,
+    def __init__(self, python: str | Path, hmr2_root: str | Path | None = None,
                  checkpoint: str | None = None, device: str = "cuda:0",
                  mesh_preview: bool = False):
         self.python = str(Path(python).expanduser().resolve())
-        self.hmr2_root = Path(hmr2_root).expanduser().resolve()
+        self.hmr2_root = (
+            Path(hmr2_root).expanduser().resolve()
+            if hmr2_root is not None
+            else None
+        )
         self.checkpoint = checkpoint
         self.checkpoint_path = ""
         self.device_name = device
@@ -338,9 +364,15 @@ class HMR2Process:
         return self._read_exact(self._process.stdout, size)
 
     def open(self) -> None:
-        worker = Path(__file__).with_name("hmr2_worker.py")
-        command = [self.python, str(worker), "--hmr2-root", str(self.hmr2_root),
-                   "--device", self.device_name]
+        command = [
+            self.python,
+            "-m",
+            "realsense_motion_capture.hmr2_worker",
+            "--device",
+            self.device_name,
+        ]
+        if self.hmr2_root is not None:
+            command += ["--hmr2-root", str(self.hmr2_root)]
         if self.checkpoint:
             command += ["--checkpoint", self.checkpoint]
         if self.mesh_preview:
@@ -367,7 +399,8 @@ class HMR2Process:
             environment["LD_LIBRARY_PATH"] = os.pathsep.join(library_paths)
         self._process = subprocess.Popen(
             command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-            stderr=None, bufsize=0, env=environment, cwd=str(self.hmr2_root))
+            stderr=None, bufsize=0, env=environment,
+            cwd=str(self.hmr2_root) if self.hmr2_root is not None else None)
         try:
             hello = json.loads(self._exchange(b"HELLO").decode("utf-8"))
             if "error" in hello:

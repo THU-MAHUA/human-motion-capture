@@ -2,25 +2,22 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-python="${POSE_CAPTURE_PYTHON:-${HOME}/anaconda3/envs/pose-capture/bin/python}"
+python="${POSE_CAPTURE_PYTHON:-}"
 mesh_python="${MESH_CAPTURE_PYTHON:-${HOME}/anaconda3/envs/mesh-capture/bin/python}"
-mesh_root="${MESH_CAPTURE_ROOT:-}"
 
-show_help=false
-for argument in "$@"; do
-  if [[ "${argument}" == "--help" || "${argument}" == "-h" ]]; then
-    show_help=true
-    break
-  fi
-done
-
-if [[ "${show_help}" == false && ( -z "${mesh_root}" || ! -d "${mesh_root}" ) ]]; then
-  echo "Set MESH_CAPTURE_ROOT to the local 4D-Humans checkout." >&2
+if [[ -z "${python}" && -n "${CONDA_PREFIX:-}" ]]; then
+  python="${CONDA_PREFIX}/bin/python"
+fi
+if [[ -z "${python}" ]]; then
+  python="$(command -v python3 || true)"
+fi
+if [[ -z "${python}" || ! -x "${python}" ]]; then
+  echo "Activate pose-capture or set POSE_CAPTURE_PYTHON." >&2
   exit 1
 fi
-
-if [[ -z "${mesh_root}" ]]; then
-  mesh_root="${repo_root}"
+if [[ ! -x "${mesh_python}" ]]; then
+  echo "Set MESH_CAPTURE_PYTHON to the mesh environment's Python executable." >&2
+  exit 1
 fi
 
 cd "${repo_root}"
@@ -31,14 +28,13 @@ exec env \
   -u QT_QPA_PLATFORM_PLUGIN_PATH \
   -u QT_PLUGIN_PATH \
   PYTHONNOUSERSITE=1 \
-  PYTHONPATH="${repo_root}/pose-capture" \
   "${python}" \
-  "${repo_root}/pose-capture/realsense_motion_capture/live_capture.py" \
+  -m realsense_motion_capture.live_capture \
   --output-dir "${repo_root}/recordings/live-mesh-d435" \
   --serial 313522072015 \
   --pose2d rtmo-l_16xb16-600e_coco-640x640 \
   --device cuda:0 \
-  --hmr2-root "${mesh_root}" \
+  --hmr2 \
   --hmr2-python "${mesh_python}" \
   --hmr2-device cuda:0 \
   --mesh-preview \

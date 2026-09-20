@@ -1,12 +1,9 @@
 """Live RealSense D4xx -> MMPose/HMR2 -> human-motion episode capture.
 
-Example::
-
-    PYTHONPATH=. python projects/realsense_motion_capture/live_capture.py \
-        --output-dir recordings/wave --serial 313522072015 --device cuda:0
-
-Controls: ``r`` toggles recording of processed frames, ``q`` quits. The raw
-RealSense bag starts when the process starts unless ``--no-bag`` is supplied.
+Run ``motion-capture --output-dir recordings/wave --device cuda:0`` after
+installing the project. Controls: ``r`` toggles recording of processed frames
+and ``q`` quits. Raw RealSense bag recording is enabled unless ``--no-bag`` is
+supplied.
 """
 
 from __future__ import annotations
@@ -63,8 +60,16 @@ def parse_args():
     parser.add_argument("--headless", action="store_true", help="capture without opening an OpenCV window")
     parser.add_argument("--max-frames", type=int, default=None,
                         help="stop cleanly after this many camera frames")
-    parser.add_argument("--hmr2-root", default=None,
-                        help="mesh-capture/4D-Humans checkout; enables SMPL human output")
+    parser.add_argument(
+        "--hmr2",
+        action="store_true",
+        help="enable optional HMR2 SMPL inference",
+    )
+    parser.add_argument(
+        "--hmr2-root",
+        default=None,
+        help="optional legacy 4D-Humans checkout override",
+    )
     parser.add_argument("--hmr2-checkpoint", default=None)
     parser.add_argument("--hmr2-device", default="cuda:0")
     parser.add_argument("--hmr2-python", default=None,
@@ -136,8 +141,6 @@ def make_split_preview(
 
 def main():
     args = parse_args()
-    if args.mesh_preview and not args.hmr2_root:
-        raise SystemExit("--mesh-preview requires --hmr2-root")
     if args.mesh_preview and args.headless:
         raise SystemExit("--mesh-preview cannot be combined with --headless")
     output_dir = Path(args.output_dir)
@@ -153,7 +156,14 @@ def main():
     )
     pose = OnePersonPose(args.pose2d, args.device)
     hmr2 = None
-    if args.hmr2_root:
+    hmr2_enabled = bool(
+        args.hmr2
+        or args.mesh_preview
+        or args.hmr2_root
+        or args.hmr2_checkpoint
+        or args.hmr2_python
+    )
+    if hmr2_enabled:
         hmr2 = (HMR2Process(
                     args.hmr2_python,
                     args.hmr2_root,
@@ -203,7 +213,11 @@ def main():
         if hmr2 is not None:
             metadata.update({
                 "smpl_coordinate_frame": "hmr2_camera",
-                "hmr2_root": str(hmr2.hmr2_root),
+                "hmr2_source": (
+                    str(hmr2.hmr2_root)
+                    if hmr2.hmr2_root is not None
+                    else "installed hmr2 package"
+                ),
                 "hmr2_detector": hmr2.detector_name,
                 "hmr2_checkpoint": hmr2.checkpoint_path,
                 "smpl_model": "SMPL neutral",

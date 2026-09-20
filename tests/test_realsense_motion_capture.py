@@ -1,9 +1,12 @@
+import sys
+
 import numpy as np
 import pytest
 
 from realsense_motion_capture.dataset import (
     EpisodeWriter, HumanEpisodeWriter, load_episode, load_human_episode)
-from realsense_motion_capture.hmr2_adapter import HMR2OnePerson, SMPLFrame
+from realsense_motion_capture.hmr2_adapter import (
+    HMR2OnePerson, HMR2Process, SMPLFrame)
 from realsense_motion_capture.live_capture import make_split_preview
 from realsense_motion_capture.processing import (
     SkeletonFrame, SkeletonProcessor, depth_to_xyz)
@@ -222,3 +225,41 @@ def test_hmr2_bbox_survives_short_detector_loss():
     assert estimator._select_bbox(image)[0] is not None
     assert estimator._select_bbox(image)[0] is not None
     assert estimator._select_bbox(image)[0] is None
+
+
+def test_hmr2_worker_does_not_require_source_checkout(monkeypatch):
+    captured = {}
+
+    class Process:
+        stdin = object()
+        stdout = object()
+
+    def fake_popen(command, **kwargs):
+        captured["command"] = command
+        captured["kwargs"] = kwargs
+        return Process()
+
+    worker = HMR2Process(sys.executable)
+    monkeypatch.setattr(
+        "realsense_motion_capture.hmr2_adapter.subprocess.Popen",
+        fake_popen,
+    )
+    monkeypatch.setattr(
+        worker,
+        "_exchange",
+        lambda payload: (
+            b'{"smpl_joint_count": 44, "body_joint_count": 23, '
+            b'"checkpoint": "/tmp/hmr2.ckpt"}'
+        ),
+    )
+
+    worker.open()
+
+    assert captured["command"][:3] == [
+        str(worker.python),
+        "-m",
+        "realsense_motion_capture.hmr2_worker",
+    ]
+    assert "--hmr2-root" not in captured["command"]
+    assert captured["kwargs"]["cwd"] is None
+    worker._process = None

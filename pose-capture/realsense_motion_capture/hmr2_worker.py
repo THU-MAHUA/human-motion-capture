@@ -37,7 +37,11 @@ def send(payload: bytes) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--hmr2-root", required=True)
+    parser.add_argument(
+        "--hmr2-root",
+        default=None,
+        help="optional legacy 4D-Humans checkout override",
+    )
     parser.add_argument("--checkpoint", default=None)
     parser.add_argument("--device", default="cuda:0")
     parser.add_argument("--mesh-preview", action="store_true")

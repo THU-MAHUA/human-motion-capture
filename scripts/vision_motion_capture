@@ -2,7 +2,18 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-python="${POSE_CAPTURE_PYTHON:-${HOME}/anaconda3/envs/pose-capture/bin/python}"
+python="${POSE_CAPTURE_PYTHON:-}"
+
+if [[ -z "${python}" && -n "${CONDA_PREFIX:-}" ]]; then
+  python="${CONDA_PREFIX}/bin/python"
+fi
+if [[ -z "${python}" ]]; then
+  python="$(command -v python3 || true)"
+fi
+if [[ -z "${python}" || ! -x "${python}" ]]; then
+  echo "Activate pose-capture or set POSE_CAPTURE_PYTHON." >&2
+  exit 1
+fi
 
 cd "${repo_root}"
 
@@ -12,9 +23,8 @@ exec env \
   -u QT_QPA_PLATFORM_PLUGIN_PATH \
   -u QT_PLUGIN_PATH \
   PYTHONNOUSERSITE=1 \
-  PYTHONPATH="${repo_root}/pose-capture" \
   "${python}" \
-  "${repo_root}/pose-capture/realsense_motion_capture/live_capture.py" \
+  -m realsense_motion_capture.live_capture \
   --output-dir "${repo_root}/recordings/rtmo-d435" \
   --serial 313522072015 \
   --pose2d rtmo-l_16xb16-600e_coco-640x640 \

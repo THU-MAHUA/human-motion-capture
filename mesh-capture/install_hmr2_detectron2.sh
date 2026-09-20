@@ -6,6 +6,7 @@ if [[ -z "${CONDA_PREFIX:-}" ]]; then
   exit 1
 fi
 
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 site_packages="${CONDA_PREFIX}/lib/python3.10/site-packages"
 cuda_runtime="${site_packages}/nvidia/cuda_runtime"
 cuda_paths=(
@@ -36,4 +37,48 @@ export LD_LIBRARY_PATH="${link_dir}:$(IFS=:; echo "${library_paths[*]}")${LD_LIB
 
 env -u PYTHONPATH PYTHONNOUSERSITE=1 \
   python -m pip install --no-build-isolation --no-cache-dir \
-  'detectron2 @ https://codeload.github.com/facebookresearch/detectron2/tar.gz/refs/heads/main'
+  -e "${repo_root}[mesh]"
+
+installed_revision() {
+  env -u PYTHONPATH PYTHONNOUSERSITE=1 python - "$1" <<'PY'
+import json
+import sys
+from importlib.metadata import distribution
+from pathlib import Path
+
+try:
+    metadata = distribution(sys.argv[1])
+    direct_url = Path(metadata._path) / "direct_url.json"
+    payload = json.loads(direct_url.read_text())
+    print(payload.get("vcs_info", {}).get("commit_id", ""))
+except Exception:
+    print("")
+PY
+}
+
+ensure_revision() {
+  local package="$1"
+  local revision="$2"
+  local requirement="$3"
+
+  if [[ "$(installed_revision "${package}")" == "${revision}" ]]; then
+    return
+  fi
+
+  env -u PYTHONPATH PYTHONNOUSERSITE=1 \
+    python -m pip install --force-reinstall --no-deps \
+    --no-build-isolation --no-cache-dir "${requirement}"
+}
+
+ensure_revision \
+  chumpy \
+  580566eafc9ac68b2614b64d6f7aaa84eebb70da \
+  "chumpy @ git+https://github.com/mattloper/chumpy.git@580566eafc9ac68b2614b64d6f7aaa84eebb70da"
+ensure_revision \
+  hmr2 \
+  efe18deff163b29dff87ddbd575fa29b716a356c \
+  "hmr2 @ git+https://github.com/shubham-goel/4D-Humans.git@efe18deff163b29dff87ddbd575fa29b716a356c"
+ensure_revision \
+  detectron2 \
+  a2f4a8771ab77e8411c26b27f24f9489a28a2453 \
+  "detectron2 @ git+https://github.com/facebookresearch/detectron2.git@a2f4a8771ab77e8411c26b27f24f9489a28a2453"
