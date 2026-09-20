@@ -13,6 +13,13 @@ checkouts. They are installed as pinned Python dependencies. Model checkpoints,
 camera recordings, and the separately licensed neutral SMPL model are not
 stored in Git.
 
+## Live Demo
+
+The split preview shows the RTMO-L skeleton on the left and the live HMR2
+white mesh on the right.
+
+https://github.com/user-attachments/assets/d9fd9525-1ac0-404e-a862-185a4528a498
+
 ## Requirements
 
 - Ubuntu or another compatible x86-64 Linux distribution
