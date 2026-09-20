@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "realsense-human-motion-capture"
+version = "0.1.0"
+description = "Intel RealSense D435 human motion capture with MMPose and optional HMR2 mesh output"
+requires-python = ">=3.10,<3.11"
+
+[tool.setuptools]
+package-dir = {"" = "pose-capture"}
+
+[tool.setuptools.packages.find]
+where = ["pose-capture"]

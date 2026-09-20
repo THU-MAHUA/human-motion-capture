@@ -1,0 +1,33 @@
+__pycache__/
+*.py[cod]
+*.so
+.pytest_cache/
+.mypy_cache/
+.coverage
+.venv/
+*.egg-info/
+.DS_Store
+.idea/
+.vscode/
+
+# Local capture outputs and camera data.
+recordings/
+*.bag
+*.npz
+*.jsonl
+
+# Downloaded model assets and caches.
+*.pth
+*.pt
+*.ckpt
+*.pkl
+*.tar
+*.tar.gz
+checkpoints/
+outputs/
+data/
+.cache/
+
+# Machine-specific configuration.
+.env
+local/

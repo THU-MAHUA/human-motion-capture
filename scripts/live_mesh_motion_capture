@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+python="${POSE_CAPTURE_PYTHON:-${HOME}/anaconda3/envs/pose-capture/bin/python}"
+mesh_python="${MESH_CAPTURE_PYTHON:-${HOME}/anaconda3/envs/mesh-capture/bin/python}"
+mesh_root="${MESH_CAPTURE_ROOT:-}"
+
+show_help=false
+for argument in "$@"; do
+  if [[ "${argument}" == "--help" || "${argument}" == "-h" ]]; then
+    show_help=true
+    break
+  fi
+done
+
+if [[ "${show_help}" == false && ( -z "${mesh_root}" || ! -d "${mesh_root}" ) ]]; then
+  echo "Set MESH_CAPTURE_ROOT to the local 4D-Humans checkout." >&2
+  exit 1
+fi
+
+if [[ -z "${mesh_root}" ]]; then
+  mesh_root="${repo_root}"
+fi
+
+cd "${repo_root}"
+
+exec env \
+  -u PYTHONPATH \
+  -u LD_LIBRARY_PATH \
+  -u QT_QPA_PLATFORM_PLUGIN_PATH \
+  -u QT_PLUGIN_PATH \
+  PYTHONNOUSERSITE=1 \
+  PYTHONPATH="${repo_root}/pose-capture" \
+  "${python}" \
+  "${repo_root}/pose-capture/realsense_motion_capture/live_capture.py" \
+  --output-dir "${repo_root}/recordings/live-mesh-d435" \
+  --serial 313522072015 \
+  --pose2d rtmo-l_16xb16-600e_coco-640x640 \
+  --device cuda:0 \
+  --hmr2-root "${mesh_root}" \
+  --hmr2-python "${mesh_python}" \
+  --hmr2-device cuda:0 \
+  --mesh-preview \
+  --record-immediately \
+  "$@"
